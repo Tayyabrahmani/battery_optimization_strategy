@@ -3,34 +3,31 @@ from .base_simulator import BatterySimulator
 class RuleBasedSimulator(BatterySimulator):
     def simulate_day(self, day_prices):
         soc = self.soc
-        daily_profit = 0.0
-        q25 = day_prices['price_eur_per_kwh'].quantile(0.25)
-        q75 = day_prices['price_eur_per_kwh'].quantile(0.75)
-
+        q25 = day_prices['price_eur_per_mwh'].quantile(0.15)
+        q75 = day_prices['price_eur_per_mwh'].quantile(0.85)
         for _, row in day_prices.iterrows():
-            price = row['price_eur_per_kwh']
+            price = row['price_eur_per_mwh']
             timestamp = row['timestamp']
-            action, profit = 'idle', 0.0
+            action = 'idle'
+            charge_mwh = discharge_mwh = 0.0
+            revenue = cost = degradation = 0.0
 
             if price < q25:
-                energy = min(self.max_power * 0.25, self.capacity - soc)
-                soc += energy * self.efficiency
-                cost = energy * price + energy * self.grid_fee + energy * self.degradation_cost
-                profit = -cost
+                charge_mwh = min(self.max_power * 0.25, self.capacity - soc)
+                soc += charge_mwh * self.efficiency
                 action = 'charge'
+
             elif price > q75:
-                energy = min(self.max_power * 0.25, soc)
-                soc -= energy
-                revenue = energy * price * self.efficiency - energy * self.degradation_cost
-                profit = revenue
+                discharge_mwh = min(self.max_power * 0.25, soc)
+                soc -= discharge_mwh
                 action = 'discharge'
 
-            daily_profit += profit
             self.results.append({
                 'timestamp': timestamp,
-                'price': price,
+                'price_eur_per_mwh': price,
                 'soc': soc,
                 'action': action,
-                'profit': daily_profit
+                'charge_mwh': charge_mwh,
+                'discharge_mwh': discharge_mwh,
             })
         self.soc = soc
