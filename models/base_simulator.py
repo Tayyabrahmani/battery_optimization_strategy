@@ -1,12 +1,12 @@
 import pandas as pd
 
 class BatterySimulator:
-    def __init__(self, capacity_mwh, power_mw, efficiency, degradation_cost_per_kwh, grid_fee_per_kwh):
+    def __init__(self, capacity_mwh, power_mw, efficiency, degradation_cost_per_mwh, grid_fee_per_mwh):
         self.capacity = capacity_mwh
         self.max_power = power_mw
         self.efficiency = efficiency
-        self.degradation_cost = degradation_cost_per_kwh
-        self.grid_fee = grid_fee_per_kwh
+        self.degradation_cost = degradation_cost_per_mwh
+        self.grid_fee = grid_fee_per_mwh
         self.soc = 0.5 * capacity_mwh
         self.results = []
 
