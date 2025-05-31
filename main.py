@@ -12,31 +12,44 @@ from models.greedy_algorithm import GreedySimulator
 import os
 import pandas as pd
 
-capacity_mwh = 1.0
-power_mw = 0.5
-efficiency = 0.80
-degradation_cost_per_mwh = 0.01 / 1000
-grid_fee_per_mwh = 0.04 / 1000
+sim_config = {
+    "capacity_mwh": 1.0,
+    "power_mw": 0.5,
+    "efficiency": 0.80,
+    "degradation_cost_per_mwh": 0.01 * 1000,
+    "grid_fee_per_mwh": 0.04 * 1000,
+}
 
+simulator_kwargs = {
+    "buy_threshold": 0.05,
+    "sell_threshold": 0.96
+}
 
-def run_simulation(model_name, simulator_cls, price_data):
+def run_simulation(model_name, simulator_cls, price_data, sim_config, rerun_simulation=False, **simulator_kwargs):
     print(f"Running simulation: {model_name}")
-    sim = simulator_cls(
-        capacity_mwh=capacity_mwh,
-        power_mw=power_mw,
-        efficiency=efficiency,
-        degradation_cost_per_mwh=degradation_cost_per_mwh,
-        grid_fee_per_mwh=grid_fee_per_mwh,
-    )
-    sim.run_simulation(price_data)
-    result_df = sim.to_dataframe()
-    result_df = calculate_profit(
-        df=result_df,
-        efficiency=efficiency,
-        degradation_cost_per_mwh=degradation_cost_per_mwh,
-        grid_fee_per_mwh=grid_fee_per_mwh,
-    )
-    save_results_to_csv(result_df, model_name)
+
+    if not rerun_simulation:
+        result_path = f"results/{model_name.replace(' ', '_')}_results.csv"
+        result_df = pd.read_csv(result_path, parse_dates=["timestamp"])
+        print(f"Loaded cached results: {result_path}")
+
+    else:
+        sim = simulator_cls(
+            **sim_config,
+            **simulator_kwargs,
+        )
+        sim.run_simulation(price_data)
+        result_df = sim.to_dataframe()
+        result_df = calculate_profit(
+            df=result_df,
+            efficiency=sim_config["efficiency"],
+            degradation_cost_per_mwh=sim_config["degradation_cost_per_mwh"],
+            grid_fee_per_mwh=sim_config["grid_fee_per_mwh"],
+        )
+        save_results_to_csv(result_df, model_name)
+
+    plot_results(result_df, title=f"{model_name} Operation")
+    print(f"{model_name} Total Profit: €{result_df['cumulative_profit'].iloc[-1]:,.2f}")
     return result_df
 
 
@@ -63,10 +76,7 @@ if __name__ == "__main__":
             price_data = load_price_data(
                 "data/Day-ahead_prices_202301010000_202501010000_Quarterhour.csv"
             )
-            result_df = run_simulation(name, cls, price_data)
+            result_df = run_simulation(name, cls, price_data, sim_config, rerun_simulation=True)
         else:
             result_df = pd.read_csv(result_path, parse_dates=["timestamp"])
             print(f"Loaded cached results: {result_path}")
-
-        plot_results(result_df, title=f"{name} Operation")
-        print(f"{name} Total Profit: €{result_df['cumulative_profit'].iloc[-1]:,.2f}")
