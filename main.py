@@ -4,6 +4,7 @@ from utils.utils import (
     save_results_to_csv,
     load_price_data,
     plot_results,
+    get_results_path
 )
 from models.simple_rule import RuleBasedSimulator
 from models.LP_optimization import LPBasedSimulator
@@ -18,6 +19,7 @@ sim_config = {
     "efficiency": 0.80,
     "degradation_cost_per_mwh": 0.01 * 1000,
     "grid_fee_per_mwh": 0.04 * 1000,
+    "pv_setup_cost_eur": 6000.0,
 }
 
 simulator_kwargs = {
@@ -25,16 +27,18 @@ simulator_kwargs = {
     "sell_threshold": 0.96
 }
 
-def run_simulation(model_name, simulator_cls, price_data, sim_config, rerun_simulation=False, **simulator_kwargs):
+def run_simulation(model_name, simulator_cls, price_data, sim_config, pv_series=None, load_series=None, rerun_simulation=False, **simulator_kwargs):
     print(f"Running simulation: {model_name}")
+    result_path = get_results_path(model_name)
 
-    if not rerun_simulation:
-        result_path = f"results/{model_name.replace(' ', '_')}_results.csv"
+    if not rerun_simulation and os.path.exists(result_path):
         result_df = pd.read_csv(result_path, parse_dates=["timestamp"])
         print(f"Loaded cached results: {result_path}")
 
     else:
         sim = simulator_cls(
+            pv_series=pv_series,
+            load_series=load_series,
             **sim_config,
             **simulator_kwargs,
         )
@@ -45,8 +49,9 @@ def run_simulation(model_name, simulator_cls, price_data, sim_config, rerun_simu
             efficiency=sim_config["efficiency"],
             degradation_cost_per_mwh=sim_config["degradation_cost_per_mwh"],
             grid_fee_per_mwh=sim_config["grid_fee_per_mwh"],
+            pv_setup_cost_eur=sim_config.get("pv_setup_cost_eur", 0.0)
         )
-        save_results_to_csv(result_df, model_name)
+        save_results_to_csv(result_df, result_path)
 
     plot_results(result_df, title=f"{model_name} Operation")
     print(f"{model_name} Total Profit: €{result_df['cumulative_profit'].iloc[-1]:,.2f}")

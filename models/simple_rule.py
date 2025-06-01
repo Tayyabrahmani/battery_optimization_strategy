@@ -1,8 +1,10 @@
 from models.base_simulator import BatterySimulator
 
 class RuleBasedSimulator(BatterySimulator):
-    def __init__(self, buy_threshold=0.15, sell_threshold=0.85, *args, **kwargs):
+    def __init__(self, buy_threshold=0.15, sell_threshold=0.85, pv_series=None, load_series=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.pv_series=pv_series
+        self.load_series=load_series
         self.buy_threshold = buy_threshold
         self.sell_threshold = sell_threshold
 
@@ -10,19 +12,32 @@ class RuleBasedSimulator(BatterySimulator):
         soc = self.soc
         buy_threshold = day_prices['price_eur_per_mwh'].quantile(self.buy_threshold)
         sell_threshold = day_prices['price_eur_per_mwh'].quantile(self.sell_threshold)
-        for _, row in day_prices.iterrows():
+
+        for ts, row in day_prices.iterrows():
             price = row['price_eur_per_mwh']
             timestamp = row['timestamp']
+            pv = self.pv_series.loc[ts] if self.pv_series is not None else 0.0
+            load = self.load_series.loc[ts] if self.load_series is not None else 0.0
+
             action = 'idle'
             charge_mwh = discharge_mwh = 0.0
+            from_pv = from_grid = to_load = to_grid = 0.0
 
             if price < buy_threshold:
-                charge_mwh = min(self.max_power * 0.25, self.capacity - soc)
+                available_capacity = self.capacity - soc
+                max_charge = min(self.max_power * 0.25, available_capacity)
+                surplus = max(pv - load, 0)
+                from_pv = min(max_charge, surplus)
+                from_grid = max_charge - from_pv
+                charge_mwh = from_pv + from_grid
                 soc += charge_mwh * self.efficiency
                 action = 'charge'
 
             elif price > sell_threshold:
-                discharge_mwh = min(self.max_power * 0.25, soc)
+                max_discharge = min(self.max_power * 0.25, soc)
+                to_load = min(max_discharge, load)
+                to_grid = max_discharge - to_load
+                discharge_mwh = to_load + to_grid
                 soc -= discharge_mwh
                 action = 'discharge'
 
@@ -33,5 +48,9 @@ class RuleBasedSimulator(BatterySimulator):
                 'action': action,
                 'charge_mwh': charge_mwh,
                 'discharge_mwh': discharge_mwh,
+                'from_pv_mwh': from_pv,
+                'from_grid_mwh': from_grid,
+                'to_load_mwh': to_load,
+                'to_grid_mwh': to_grid,
             })
         self.soc = soc
