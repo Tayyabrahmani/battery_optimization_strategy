@@ -1,17 +1,15 @@
 import argparse
+import os
+import pandas as pd
 from utils.utils import (
     calculate_profit,
     save_results_to_csv,
     load_price_data,
     plot_results,
-    get_results_path
+    get_results_path,
 )
 from models.simple_rule import RuleBasedSimulator
 from models.LP_optimization import LPBasedSimulator
-from models.heuristic_optimizer import HeuristicOptimizerSimulator
-from models.greedy_algorithm import GreedySimulator
-import os
-import pandas as pd
 
 sim_config = {
     "capacity_mwh": 1.0,
@@ -20,14 +18,23 @@ sim_config = {
     "degradation_cost_per_mwh": 0.01 * 1000,
     "grid_fee_per_mwh": 0.04 * 1000,
     "pv_setup_cost_eur": 6000.0,
+    "capacity_mw": 5,
+    "peak_mw": 8,
 }
 
-simulator_kwargs = {
-    "buy_threshold": 0.05,
-    "sell_threshold": 0.96
-}
+simulator_kwargs = {"buy_threshold": 0.05, "sell_threshold": 0.96}
 
-def run_simulation(model_name, simulator_cls, price_data, sim_config, pv_series=None, load_series=None, rerun_simulation=False, **simulator_kwargs):
+
+def run_simulation(
+    model_name,
+    simulator_cls,
+    price_data,
+    sim_config,
+    pv_series=None,
+    load_series=None,
+    rerun_simulation=False,
+    **simulator_kwargs,
+):
     print(f"Running simulation: {model_name}")
     result_path = get_results_path(model_name)
 
@@ -49,7 +56,7 @@ def run_simulation(model_name, simulator_cls, price_data, sim_config, pv_series=
             efficiency=sim_config["efficiency"],
             degradation_cost_per_mwh=sim_config["degradation_cost_per_mwh"],
             grid_fee_per_mwh=sim_config["grid_fee_per_mwh"],
-            pv_setup_cost_eur=sim_config.get("pv_setup_cost_eur", 0.0)
+            pv_setup_cost_eur=sim_config.get("pv_setup_cost_eur", 0.0),
         )
         save_results_to_csv(result_df, result_path)
 
@@ -58,7 +65,7 @@ def run_simulation(model_name, simulator_cls, price_data, sim_config, pv_series=
     return result_df
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--simulate",
@@ -69,19 +76,27 @@ if __name__ == "__main__":
 
     # Registered strategies
     models = {
-        # "Linear-Programming": LPBasedSimulator,
-        # "Rule-Based": RuleBasedSimulator,
-        # "Heuristic-Optimizer": HeuristicOptimizerSimulator,
-        "Greedy-Simulator": GreedySimulator,
+        "Linear-Programming": LPBasedSimulator,
+        "Rule-Based": RuleBasedSimulator,
     }
+
+    price_data = load_price_data(
+        "data/Day-ahead_prices_202301010000_202501010000_Quarterhour.csv"
+    )
 
     for name, cls in models.items():
         result_path = f"results/{name.replace(' ', '_')}_results.csv"
-        if args.simulate or not os.path.exists(result_path):
-            price_data = load_price_data(
-                "data/Day-ahead_prices_202301010000_202501010000_Quarterhour.csv"
-            )
-            result_df = run_simulation(name, cls, price_data, sim_config, rerun_simulation=True)
-        else:
-            result_df = pd.read_csv(result_path, parse_dates=["timestamp"])
-            print(f"Loaded cached results: {result_path}")
+        rerun = args.simulate or not os.path.exists(result_path)
+
+        run_simulation(
+            model_name=name,
+            simulator_cls=cls,
+            price_data=price_data,
+            sim_config=sim_config,
+            rerun_simulation=rerun,
+            **simulator_kwargs,
+        )
+
+
+if __name__ == "__main__":
+    main()
