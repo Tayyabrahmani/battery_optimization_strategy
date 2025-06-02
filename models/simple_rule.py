@@ -1,6 +1,6 @@
 from models.base_simulator import BatterySimulator
 
-class RuleBasedSimulator(BatterySimulator):
+class ThresholdBasedSimulator(BatterySimulator):
     def __init__(self, buy_threshold=0.15, sell_threshold=0.85, pv_series=None, load_series=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pv_series=pv_series

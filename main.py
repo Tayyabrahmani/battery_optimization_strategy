@@ -8,8 +8,9 @@ from utils.utils import (
     plot_results,
     get_results_path,
 )
-from models.simple_rule import RuleBasedSimulator
+from models.simple_rule import ThresholdBasedSimulator
 from models.LP_optimization import LPBasedSimulator
+from models.rule_based import TimeWindowRuleBasedSimulator
 
 sim_config = {
     "capacity_mwh": 1.0,
@@ -76,8 +77,9 @@ def main():
 
     # Registered strategies
     models = {
+        "Threshold-Based": ThresholdBasedSimulator,
+        "Rule-Based": TimeWindowRuleBasedSimulator,
         "Linear-Programming": LPBasedSimulator,
-        "Rule-Based": RuleBasedSimulator,
     }
 
     price_data = load_price_data(
