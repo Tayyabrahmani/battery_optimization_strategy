@@ -29,6 +29,7 @@ class LPBasedSimulator:
         load = self.load_series.loc[day_prices.index].values if self.load_series is not None else np.zeros(n)
 
         # Decision variables
+        export_pv_to_grid = cp.Variable(n, nonneg=True)
         charge_from_pv = cp.Variable(n, nonneg=True)
         charge_from_grid = cp.Variable(n, nonneg=True)
         charge = charge_from_pv + charge_from_grid
@@ -39,15 +40,16 @@ class LPBasedSimulator:
         constraints = [soc[0] == self.soc]
         for t in range(n):
             net_surplus = pv[t] - load[t]  # +ve = excess energy, -ve = net demand
+            surplus = max(pv[t] - load[t], 0)
 
             constraints += [
-                soc[t + 1] == soc[t] + charge[t] * self.efficiency * dt - discharge[t] / self.efficiency * dt,
-                charge_from_pv[t] <= max(pv[t] - load[t], 0),
-                charge_from_grid[t] <= self.max_power * dt,
-                charge[t] <= self.max_power * dt,
-                discharge[t] <= self.max_power * dt,
-                soc[t+1] >= 0,
-                soc[t+1] <= self.capacity
+                soc[t + 1] == soc[t] + charge[t] * self.efficiency * dt - discharge[t] / self.efficiency * dt,   # SoC at every stage
+                charge_from_pv[t] + export_pv_to_grid[t] <= surplus,   # Capacity constraint for PV, total energy used or sold not exceed surplus energy 
+                charge_from_grid[t] <= self.max_power * dt,  # Energy from grid should not exceed maximum battery charge level per interval
+                charge[t] <= self.max_power * dt,   # Total charges from all sources should not exceed maximum battery charge level per interval
+                discharge[t] <= self.max_power * dt,   # Total discharges from all sources should not exceed maximum battery charge level per interval
+                soc[t+1] >= 0,   # SoC should never be negative
+                soc[t+1] <= self.capacity   # SoC should not exceed capacity
             ]
 
             # Limit charging from grid if PV surplus is available
@@ -61,8 +63,9 @@ class LPBasedSimulator:
         degradation = cp.multiply(self.degradation_cost, charge + discharge)
         grid_cost = cp.multiply(charge_from_grid, prices + self.grid_fee)
         revenue = cp.multiply(discharge * self.efficiency, prices)
+        pv_export_revenue = cp.multiply(export_pv_to_grid, prices)
 
-        profit = cp.sum(revenue - grid_cost - degradation)
+        profit = cp.sum(revenue + pv_export_revenue - grid_cost - degradation)
         problem = cp.Problem(cp.Maximize(profit), constraints)
 
 
@@ -75,9 +78,8 @@ class LPBasedSimulator:
         for i in range(n):
             action = 'charge' if charge.value[i] > 1e-5 else 'discharge' if discharge.value[i] > 1e-5 else 'idle'
 
-            from_pv = min(charge.value[i], max(pv[i] - load[i], 0))
-            from_grid = charge.value[i] - from_pv
-
+            from_pv = charge_from_pv.value[i]
+            from_grid = charge_from_grid.value[i]
             to_load = min(discharge.value[i], load[i])
             to_grid = max(discharge.value[i] - to_load, 0)
 
@@ -91,7 +93,8 @@ class LPBasedSimulator:
                 'from_pv_mwh': from_pv,
                 'from_grid_mwh': from_grid,
                 'to_load_mwh': to_load,
-                'to_grid_mwh': to_grid                
+                'to_grid_mwh': to_grid,                
+                'pv_export_mwh': export_pv_to_grid.value[i],
             })
 
     def run_simulation(self, price_df):

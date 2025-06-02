@@ -19,7 +19,7 @@ class TimeWindowRuleBasedSimulator(BatterySimulator):
 
             action = 'idle'
             charge_mwh = discharge_mwh = 0.0
-            from_pv = from_grid = to_load = to_grid = 0.0
+            from_pv = from_grid = to_load = to_grid = pv_export_mwh = 0.0
 
             if self.buy_hours[0] <= timestamp.hour < self.buy_hours[1]:
                 available_capacity = self.capacity - soc
@@ -30,6 +30,8 @@ class TimeWindowRuleBasedSimulator(BatterySimulator):
                 charge_mwh = from_pv + from_grid
                 soc += charge_mwh * self.efficiency
                 action = 'charge'
+                pv_used = from_pv + min(load, pv)
+                pv_export_mwh = max(pv - pv_used, 0)
 
             elif self.sell_hours[0] <= timestamp.hour < self.sell_hours[1]:
                 max_discharge = min(self.max_power * 0.25, soc)
@@ -38,6 +40,12 @@ class TimeWindowRuleBasedSimulator(BatterySimulator):
                 discharge_mwh = to_load + to_grid
                 soc -= discharge_mwh
                 action = 'discharge'
+                pv_used = min(load, pv)
+                pv_export_mwh = max(pv - pv_used, 0)
+
+            else:
+                pv_used = min(load, pv)
+                pv_export_mwh = max(pv - pv_used, 0)
 
             self.results.append({
                 'timestamp': timestamp,
@@ -50,6 +58,7 @@ class TimeWindowRuleBasedSimulator(BatterySimulator):
                 'from_grid_mwh': from_grid,
                 'to_load_mwh': to_load,
                 'to_grid_mwh': to_grid,
+                'pv_export_mwh': pv_export_mwh,
             })
 
         self.soc = soc

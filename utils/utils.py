@@ -41,19 +41,36 @@ def get_results_path(model_name: str) -> str:
     return os.path.join(results_dir, filename)
 
 def calculate_profit(df, efficiency, grid_fee_per_mwh, degradation_cost_per_mwh, pv_setup_cost_eur):
-    df["revenue"] = df["discharge_mwh"] * efficiency * df["price_eur_per_mwh"]
+    # Battery discharge revenue
+    df["revenue_battery"] = df["discharge_mwh"] * efficiency * df["price_eur_per_mwh"]
+
+    # PV export revenue
+    df["revenue_pv_export"] = df.get("pv_export_mwh", 0.0) * df["price_eur_per_mwh"]
+
+    # Total revenue
+    df["revenue"] = df["revenue_battery"] + df["revenue_pv_export"]
+
+    # Grid energy cost
     df["cost"] = df["from_grid_mwh"] * (df["price_eur_per_mwh"] + grid_fee_per_mwh)
+
+    # Battery degradation cost
     df["degradation"] = degradation_cost_per_mwh * (df["charge_mwh"] + df["discharge_mwh"])
+
+    # Interval profit
     df["interval_profit"] = df["revenue"] - df["cost"] - df["degradation"]
 
-    # Deduct setup cost once at the start
-    # if pv_setup_cost_eur > 0:
-    #     df.at[0, "interval_profit"] -= pv_setup_cost_eur
+    # Deduct PV setup cost once, if any
+    if pv_setup_cost_eur > 0:
+        df.at[0, "interval_profit"] -= pv_setup_cost_eur
 
+    # Cumulative metrics
     df["cumulative_profit"] = df["interval_profit"].cumsum()
     df["cumulative_degradation"] = df["degradation"].cumsum()
     df["cumulative_grid_cost"] = df["cost"].cumsum()
+    df["cumulative_pv_revenue"] = df["revenue_pv_export"].cumsum()
+
     return df
+
 
 def save_results_to_csv(df, file_path, output_dir="results"):
     os.makedirs(output_dir, exist_ok=True)
@@ -181,25 +198,6 @@ def count_battery_cycles(soc_series: pd.Series, resolution_hours=0.25) -> pd.Dat
     df["energy_mwh"] = df["depth"] * df["count"] * resolution_hours
     return df
 
-def summarize_simulation(df: pd.DataFrame, model_col: str = "Model_Name"):
-    grouped = df.groupby(model_col)
-    summary = {}
-
-    for model, group in grouped:
-        summary[model] = {
-            "Total Revenue (€)": group["revenue"].sum(),
-            "Total Grid Cost (€)": group["cost"].sum(),
-            "Total Degradation Cost (€)": group["degradation"].sum(),
-            "Net Profit (€)": group["interval_profit"].sum(),
-            "Energy Imported (MWh)": group["from_grid_mwh"].sum(),
-            "Energy Exported (MWh)": group["to_grid_mwh"].sum(),
-            "Total Charge (MWh)": group["charge_mwh"].sum(),
-            "Total Discharge (MWh)": group["discharge_mwh"].sum(),
-            "Average SoC (MWh)": group["soc"].mean(),
-        }
-
-    return pd.DataFrame(summary)
-
 def calculate_utilization(df):
     total_discharge = df["discharge_mwh"].sum()
     full_cycles = total_discharge / df["soc"].max()
@@ -211,10 +209,26 @@ def calculate_utilization(df):
     return pd.DataFrame([utilization], index=["Value"]).T
 
 
-def calculate_financial_kpis(df: pd.DataFrame, initial_cost: float = None, power_mw: float = None) -> pd.DataFrame:
+def summarize_simulation_operation_kpi(df: pd.DataFrame, model_col: str = "Model_Name"):
+    grouped = df.groupby(model_col)
+    summary = {}
+
+    for model, group in grouped:
+        summary[model] = {
+            "Energy Imported (MWh)": group["from_grid_mwh"].sum(),
+            "Energy Exported (MWh)": group["to_grid_mwh"].sum(),
+            "Total Charge (MWh)": group["charge_mwh"].sum(),
+            "Total Discharge (MWh)": group["discharge_mwh"].sum(),
+            "Average SoC (MWh)": group["soc"].mean(),
+        }
+
+    return pd.DataFrame(summary)
+
+
+def calculate_financial_kpis(df: pd.DataFrame, model_col: str = "Model_Name", initial_cost: float = None, power_mw: float = None) -> pd.DataFrame:
     days = df['timestamp'].dt.date.nunique()
 
-    grouped = df.groupby('Model_Name')
+    grouped = df.groupby(model_col)
     summary = {}
 
     for model, group in grouped:
@@ -229,7 +243,11 @@ def calculate_financial_kpis(df: pd.DataFrame, initial_cost: float = None, power
         max_energy_possible = days * 24 * power_mw if power_mw else None
 
         kpis = {
+            "Total Revenue (€)": revenue,
+            "Total Grid Cost (€)": cost,
+            "Total Degradation Cost (€)": degradation,
             "Total Profit (€)": total_profit,
+            "Initial Cost (€)": initial_cost,
             "ROI (%)": roi,
             "Estimated Payback Time (Years)": payback_years,
             "Profit per MWh Cycled (€ / MWh)": total_profit / energy_throughput if energy_throughput else None,
