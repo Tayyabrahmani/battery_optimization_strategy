@@ -44,10 +44,15 @@ def run_simulation(
         print(f"Loaded cached results: {result_path}")
 
     else:
+        filtered_config = {
+            k: v for k, v in sim_config.items()
+            if k in ['capacity_mwh', 'power_mw', 'efficiency', 'degradation_cost_per_mwh', 'grid_fee_per_mwh']
+        }
+
         sim = simulator_cls(
             pv_series=pv_series,
             load_series=load_series,
-            **sim_config,
+            **filtered_config,
             **simulator_kwargs,
         )
         sim.run_simulation(price_data)
@@ -59,11 +64,12 @@ def run_simulation(
             grid_fee_per_mwh=sim_config["grid_fee_per_mwh"],
             pv_setup_cost_eur=sim_config.get("pv_setup_cost_eur", 0.0),
         )
+        result_df['Model_Name'] = model_name
         save_results_to_csv(result_df, result_path)
 
-    plot_results(result_df, title=f"{model_name} Operation")
+    fig = plot_results(result_df, title=f"{model_name} Operation")
     print(f"{model_name} Total Profit: €{result_df['cumulative_profit'].iloc[-1]:,.2f}")
-    return result_df
+    return result_df, fig
 
 
 def main():
@@ -90,7 +96,7 @@ def main():
         result_path = f"results/{name.replace(' ', '_')}_results.csv"
         rerun = args.simulate or not os.path.exists(result_path)
 
-        run_simulation(
+        result_df, fig = run_simulation(
             model_name=name,
             simulator_cls=cls,
             price_data=price_data,
@@ -98,6 +104,8 @@ def main():
             rerun_simulation=rerun,
             **simulator_kwargs,
         )
+
+        fig.show()
 
 
 if __name__ == "__main__":
