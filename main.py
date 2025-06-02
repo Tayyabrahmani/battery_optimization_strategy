@@ -8,7 +8,7 @@ from utils.utils import (
     plot_results,
     get_results_path,
 )
-from models.simple_rule import ThresholdBasedSimulator
+from models.threshold_based import ThresholdBasedSimulator
 from models.LP_optimization import LPBasedSimulator
 from models.rule_based import TimeWindowRuleBasedSimulator
 
