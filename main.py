@@ -18,10 +18,11 @@ sim_config = {
     "efficiency": 0.80,
     "degradation_cost_per_mwh": 0.01 * 1000,
     "grid_fee_per_mwh": 0.04 * 1000,
-    "pv_setup_cost_eur": 6000.0,
     "capacity_mw": 5,
     "peak_mw": 8,
 }
+
+sim_config["battery_cost_eur"] = sim_config["capacity_mw"] * 500 * 1000
 
 simulator_kwargs = {"buy_threshold": 0.05, "sell_threshold": 0.96}
 
