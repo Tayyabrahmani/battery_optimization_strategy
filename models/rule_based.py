@@ -2,10 +2,12 @@ from models.base_simulator import BatterySimulator
 import pandas as pd
 
 class TimeWindowRuleBasedSimulator(BatterySimulator):
-    def __init__(self, pv_series=None, load_series=None, *args, **kwargs):
+    def __init__(self, pv_series=None, load_series=None, buy_hours=[12, 14], sell_hours=[19, 21], *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pv_series = pv_series
         self.load_series = load_series
+        self.buy_hours = buy_hours
+        self.sell_hours = sell_hours
 
     def simulate_day(self, day_prices: pd.DataFrame):
         soc = self.soc
@@ -19,7 +21,7 @@ class TimeWindowRuleBasedSimulator(BatterySimulator):
             charge_mwh = discharge_mwh = 0.0
             from_pv = from_grid = to_load = to_grid = 0.0
 
-            if 12 <= timestamp.hour < 14:
+            if self.buy_hours[0] <= timestamp.hour < self.buy_hours[1]:
                 available_capacity = self.capacity - soc
                 max_charge = min(self.max_power * 0.25, available_capacity)
                 surplus = max(pv - load, 0)
@@ -29,7 +31,7 @@ class TimeWindowRuleBasedSimulator(BatterySimulator):
                 soc += charge_mwh * self.efficiency
                 action = 'charge'
 
-            elif 19 <= timestamp.hour < 21:
+            elif self.sell_hours[0] <= timestamp.hour < self.sell_hours[1]:
                 max_discharge = min(self.max_power * 0.25, soc)
                 to_load = min(max_discharge, load)
                 to_grid = max_discharge - to_load
