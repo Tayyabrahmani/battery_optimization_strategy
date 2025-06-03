@@ -4,21 +4,24 @@ import numpy as np
 import plotly.graph_objects as go
 import rainflow
 import plotly.io as pio
+
 pio.renderers.default = "browser"
 
+
 def load_price_data(file_path):
-    df = pd.read_csv(file_path, low_memory=False, usecols=[0,1,2])
+    df = pd.read_csv(file_path, low_memory=False, usecols=[0, 1, 2])
     try:
-        df['Start date'] = pd.to_datetime(df['Start date'], format="%b %d, %Y %I:%M %p")
-        df['End date'] = pd.to_datetime(df['End date'], format="%b %d, %Y %I:%M %p")
+        df["Start date"] = pd.to_datetime(df["Start date"], format="%b %d, %Y %I:%M %p")
+        df["End date"] = pd.to_datetime(df["End date"], format="%b %d, %Y %I:%M %p")
     except Exception as e:
         print(e)
 
     df = df.rename(columns={"Germany/Luxembourg [€/MWh]": "price_eur_per_mwh"})
 
     # Assuming start time as the timestamp
-    df['timestamp'] = df['Start date']
+    df["timestamp"] = df["Start date"]
     return df
+
 
 def get_results_path(model_name: str) -> str:
     cwd = os.getcwd()
@@ -30,7 +33,9 @@ def get_results_path(model_name: str) -> str:
             break
         parent = os.path.dirname(cwd)
         if parent == cwd:
-            raise FileNotFoundError("Could not find project root (pyproject.toml or .git).")
+            raise FileNotFoundError(
+                "Could not find project root (pyproject.toml or .git)."
+            )
         cwd = parent
 
     results_dir = os.path.join(base_dir, "results")
@@ -39,7 +44,10 @@ def get_results_path(model_name: str) -> str:
     filename = f"{model_name.replace(' ', '_')}_results.csv"
     return os.path.join(results_dir, filename)
 
-def calculate_profit(df, efficiency, grid_fee_per_mwh, degradation_cost_per_mwh, pv_setup_cost_eur):
+
+def calculate_profit(
+    df, efficiency, grid_fee_per_mwh, degradation_cost_per_mwh, pv_setup_cost_eur
+):
     # Battery discharge revenue
     df["revenue_battery"] = df["discharge_mwh"] * efficiency * df["price_eur_per_mwh"]
 
@@ -53,7 +61,9 @@ def calculate_profit(df, efficiency, grid_fee_per_mwh, degradation_cost_per_mwh,
     df["cost"] = df["from_grid_mwh"] * (df["price_eur_per_mwh"] + grid_fee_per_mwh)
 
     # Battery degradation cost
-    df["degradation"] = degradation_cost_per_mwh * (df["charge_mwh"] + df["discharge_mwh"])
+    df["degradation"] = degradation_cost_per_mwh * (
+        df["charge_mwh"] + df["discharge_mwh"]
+    )
 
     # Interval profit
     df["interval_profit"] = df["revenue"] - df["cost"] - df["degradation"]
@@ -75,6 +85,7 @@ def save_results_to_csv(df, file_path, output_dir="results"):
     os.makedirs(output_dir, exist_ok=True)
     df.to_csv(file_path, index=False)
 
+
 def simulate_pv_generation(df: pd.DataFrame, capacity_mw: float = 5.0) -> pd.Series:
     """
     Simulate PV generation [MWh per 15-min interval] for a given timestamped DataFrame.
@@ -88,7 +99,9 @@ def simulate_pv_generation(df: pd.DataFrame, capacity_mw: float = 5.0) -> pd.Ser
 
         # Daily irradiance profile (0 at night, peak at noon)
         daylight_factor = max(0, np.sin(np.pi * (hour - 6) / 12))  # peak at 12:00
-        seasonal_scaling = 0.9 + 0.1 * np.cos(2 * np.pi * (doy - 173) / 365)  # max in June
+        seasonal_scaling = 0.9 + 0.1 * np.cos(
+            2 * np.pi * (doy - 173) / 365
+        )  # max in June
 
         # Simulated output power [MW]
         power_mw = capacity_mw * daylight_factor * seasonal_scaling
@@ -98,6 +111,7 @@ def simulate_pv_generation(df: pd.DataFrame, capacity_mw: float = 5.0) -> pd.Ser
         pv_output.append(energy_mwh)
 
     return pd.Series(pv_output, index=df.index, name="pv_generation_mwh")
+
 
 def simulate_load_series(df: pd.DataFrame, peak_mw: float = 8.0) -> pd.Series:
     """
@@ -127,6 +141,7 @@ def simulate_load_series(df: pd.DataFrame, peak_mw: float = 8.0) -> pd.Series:
 
     return pd.Series(load_output, index=df.index, name="load_demand_mwh")
 
+
 def count_battery_cycles(soc_series: pd.Series, resolution_hours=0.25) -> pd.DataFrame:
     """
     Apply rainflow counting to a SoC series.
@@ -137,13 +152,16 @@ def count_battery_cycles(soc_series: pd.Series, resolution_hours=0.25) -> pd.Dat
     df["energy_mwh"] = df["depth"] * df["count"] * resolution_hours
     return df
 
+
 def calculate_utilization(df):
     total_discharge = df["discharge_mwh"].sum()
     full_cycles = total_discharge / df["soc"].max()
     utilization = {
         "Full Equivalent Cycles": full_cycles,
         "Total Discharge (MWh)": total_discharge,
-        "Avg Depth of Discharge per Action (MWh)": df["discharge_mwh"][df["discharge_mwh"] > 0].mean()
+        "Avg Depth of Discharge per Action (MWh)": df["discharge_mwh"][
+            df["discharge_mwh"] > 0
+        ].mean(),
     }
     return pd.DataFrame([utilization], index=["Value"]).T
 
@@ -164,8 +182,13 @@ def summarize_simulation_operation_kpi(df: pd.DataFrame, model_col: str = "Model
     return pd.DataFrame(summary)
 
 
-def calculate_financial_kpis(df: pd.DataFrame, model_col: str = "Model_Name", initial_cost: float = None, power_mw: float = None) -> pd.DataFrame:
-    days = df['timestamp'].dt.date.nunique()
+def calculate_financial_kpis(
+    df: pd.DataFrame,
+    model_col: str = "Model_Name",
+    initial_cost: float = None,
+    power_mw: float = None,
+) -> pd.DataFrame:
+    days = df["timestamp"].dt.date.nunique()
 
     grouped = df.groupby(model_col)
     summary = {}
@@ -176,7 +199,9 @@ def calculate_financial_kpis(df: pd.DataFrame, model_col: str = "Model_Name", in
         degradation = group["degradation"].sum()
         total_profit = group["interval_profit"].sum()
         annualized_profit = total_profit / (len(group) * 0.25 / 24 / 365)
-        payback_years = initial_cost / annualized_profit if annualized_profit != 0 else float('inf')
+        payback_years = (
+            initial_cost / annualized_profit if annualized_profit != 0 else float("inf")
+        )
         roi = total_profit / initial_cost * 100
         energy_throughput = group["charge_mwh"].sum() + group["discharge_mwh"].sum()
         max_energy_possible = days * 24 * power_mw if power_mw else None
@@ -189,13 +214,29 @@ def calculate_financial_kpis(df: pd.DataFrame, model_col: str = "Model_Name", in
             "Initial Cost (€)": initial_cost,
             "ROI (%)": roi,
             "Estimated Payback Time (Years)": payback_years,
-            "Profit per MWh Cycled (€ / MWh)": total_profit / energy_throughput if energy_throughput else None,
+            "Profit per MWh Cycled (€ / MWh)": (
+                total_profit / energy_throughput if energy_throughput else None
+            ),
             "Return on Energy (%)": ((revenue - cost) / cost) * 100 if cost else None,
-            "Revenue-to-Cost Ratio": revenue / (cost + degradation) if (cost + degradation) else None,
-            "Degradation Cost Share (%)": (degradation / (cost + degradation)) * 100 if (cost + degradation) else None,
-            "Energy Utilization (%)": (energy_throughput / max_energy_possible) * 100 if max_energy_possible else None,
+            "Revenue-to-Cost Ratio": (
+                revenue / (cost + degradation) if (cost + degradation) else None
+            ),
+            "Degradation Cost Share (%)": (
+                (degradation / (cost + degradation)) * 100
+                if (cost + degradation)
+                else None
+            ),
+            "Energy Utilization (%)": (
+                (energy_throughput / max_energy_possible) * 100
+                if max_energy_possible
+                else None
+            ),
             "Average Daily Profit (€)": total_profit / days if days else None,
-            "Profit Volatility (Std Dev)": group.groupby(group['timestamp'].dt.date)["interval_profit"].sum().std()
+            "Profit Volatility (Std Dev)": group.groupby(group["timestamp"].dt.date)[
+                "interval_profit"
+            ]
+            .sum()
+            .std(),
         }
 
         summary[model] = kpis
