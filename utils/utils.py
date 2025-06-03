@@ -21,17 +21,16 @@ def load_price_data(file_path):
     return df
 
 def get_results_path(model_name: str) -> str:
-    target_root = "battery_optimization_strategy"
     cwd = os.getcwd()
 
-    # Traverse up to find project root
+    # Look for marker file or directory
     while True:
-        if target_root in os.listdir(cwd):
-            base_dir = os.path.join(cwd, target_root)
+        if "pyproject.toml" in os.listdir(cwd) or ".git" in os.listdir(cwd):
+            base_dir = cwd
             break
         parent = os.path.dirname(cwd)
-        if parent == cwd:  # Reached root without finding project
-            raise FileNotFoundError(f"Could not find project root: {target_root}")
+        if parent == cwd:
+            raise FileNotFoundError("Could not find project root (pyproject.toml or .git).")
         cwd = parent
 
     results_dir = os.path.join(base_dir, "results")
