@@ -5,12 +5,19 @@ from utils.utils import (
     calculate_profit,
     save_results_to_csv,
     load_price_data,
-    plot_results,
     get_results_path,
 )
+from utils.plotting import plot_results
 from models.threshold_based import ThresholdBasedSimulator
 from models.LP_optimization import LPBasedSimulator
 from models.rule_based import TimeWindowRuleBasedSimulator
+
+import logging
+from utils.logging_config import setup_logging
+
+# Setup Logging
+setup_logging(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 sim_config = {
     "capacity_mwh": 1.0,
@@ -24,8 +31,11 @@ sim_config = {
 
 sim_config["battery_cost_eur"] = sim_config["capacity_mw"] * 500 * 1000
 
-simulator_kwargs = {"buy_threshold": 0.05, "sell_threshold": 0.96}
-
+simulator_configs = {
+    "Threshold-Based": {"buy_threshold": 0.05, "sell_threshold": 0.95},
+    "Rule-Based": {},
+    "Linear-Programming": {},
+}
 
 def run_simulation(
     model_name,
@@ -37,18 +47,20 @@ def run_simulation(
     rerun_simulation=False,
     **simulator_kwargs,
 ):
-    print(f"Running simulation: {model_name}")
+    logger.info(f"Running simulation: {model_name}")
     result_path = get_results_path(model_name)
 
     if not rerun_simulation and os.path.exists(result_path):
         result_df = pd.read_csv(result_path, parse_dates=["timestamp"])
-        print(f"Loaded cached results: {result_path}")
+        logger.info(f"Loaded cached results: {result_path}")
 
     else:
         filtered_config = {
             k: v for k, v in sim_config.items()
             if k in ['capacity_mwh', 'power_mw', 'efficiency', 'degradation_cost_per_mwh', 'grid_fee_per_mwh']
         }
+        logger.debug(f"Filtered simulation config: {filtered_config}")
+        logger.debug(f"Simulator kwargs: {simulator_kwargs}")
 
         sim = simulator_cls(
             pv_series=pv_series,
@@ -67,9 +79,11 @@ def run_simulation(
         )
         result_df['Model_Name'] = model_name
         save_results_to_csv(result_df, result_path)
+        logger.info(f"Simulation complete. Results saved to {result_path}")
 
     fig = plot_results(result_df, title=f"{model_name} Operation")
-    print(f"{model_name} Total Profit: €{result_df['cumulative_profit'].iloc[-1]:,.2f}")
+    total_profit = result_df['cumulative_profit'].iloc[-1]
+    logger.info(f"{model_name} Total Profit: €{total_profit:,.2f}")
     return result_df, fig
 
 
@@ -80,7 +94,21 @@ def main():
         action="store_true",
         help="Run a new simulation (default: use saved results)",
     )
+    parser.add_argument(
+        "--data-path",
+        type=str,
+        required=True,
+        help="Path to the CSV file containing price data",
+    )
+    parser.add_argument(
+        "--strategy",
+        type=str,
+        choices=["Threshold-Based", "Rule-Based", "Linear-Programming"],
+        required=True,
+        help="Name of the strategy to simulate",
+    )
     args = parser.parse_args()
+    logger.info(f"Args received: {args}")
 
     # Registered strategies
     models = {
@@ -89,25 +117,27 @@ def main():
         "Linear-Programming": LPBasedSimulator,
     }
 
-    price_data = load_price_data(
-        "data/Day-ahead_prices_202301010000_202501010000_Quarterhour.csv"
+    price_data = load_price_data(args.data_path)
+    logger.debug(f"Loaded price data from {args.data_path}, shape: {price_data.shape}")
+
+    model_name = args.strategy
+    simulator_cls = models[model_name]
+    result_path = f"results/{model_name.replace(' ', '_')}_results.csv"
+    rerun = args.simulate or not os.path.exists(result_path)
+
+    simulator_kwargs = simulator_configs.get(model_name, {})
+
+    result_df, fig = run_simulation(
+        model_name=model_name,
+        simulator_cls=simulator_cls,
+        price_data=price_data,
+        sim_config=sim_config,
+        rerun_simulation=rerun,
+        **simulator_kwargs,
     )
 
-    for name, cls in models.items():
-        result_path = f"results/{name.replace(' ', '_')}_results.csv"
-        rerun = args.simulate or not os.path.exists(result_path)
-
-        result_df, fig = run_simulation(
-            model_name=name,
-            simulator_cls=cls,
-            price_data=price_data,
-            sim_config=sim_config,
-            rerun_simulation=rerun,
-            **simulator_kwargs,
-        )
-
-        fig.show()
-
+    fig.show()
+    logger.info("Simulation complete and figure shown")
 
 if __name__ == "__main__":
     main()

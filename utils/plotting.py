@@ -2,6 +2,7 @@ import plotly.express as px
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import pandas as pd
+import os
 
 def plot_prices(df, title='Average Electricity Prices', y_column='price_eur_per_mwh', tickformat="%b %d\n%Y"):
     """
@@ -407,4 +408,61 @@ def plot_sensitivity_analysis(
         margin=dict(l=60, r=60, t=60, b=60)
     )
 
+    return fig
+
+def plot_results(df, title, output_dir="results"):
+    fig = go.Figure()
+
+    # Add price trace (left y-axis)
+    fig.add_trace(go.Scatter(
+        x=df["timestamp"],
+        y=df["cumulative_profit"],
+        name="Cumulative Profit (€)",
+        yaxis="y1",
+        mode="lines"
+    ))
+
+    # Add soc trace (right y-axis)
+    fig.add_trace(go.Scatter(
+        x=df["timestamp"],
+        y=df["soc"],
+        name="State of Charge (SOC)",
+        yaxis="y2",
+        mode="lines"
+    ))
+
+    # Update layout with two y-axes
+    fig.update_layout(
+        title=title,
+        xaxis=dict(
+            title="Time",
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1, label="1d", step="day", stepmode="backward"),
+                    dict(count=7, label="1w", step="day", stepmode="backward"),
+                    dict(count=1, label="1m", step="month", stepmode="backward"),
+                    dict(step="all")
+                ])
+            ),
+            rangeslider=dict(visible=True),
+            type="date"
+        ),
+        yaxis=dict(
+            title="Cumulative Profit (€)",
+            side="left"
+        ),
+        yaxis2=dict(
+            title="SOC",
+            overlaying="y",
+            side="right"
+        ),
+        legend_title="Metric",
+        height=500,
+        width=1000
+    )
+
+    # Save plot as HTML
+    os.makedirs(output_dir, exist_ok=True)
+    filename = os.path.join(output_dir, f"{title.replace(' ', '_')}.html")
+    fig.write_html(filename)
     return fig
