@@ -12,6 +12,13 @@ from models.threshold_based import ThresholdBasedSimulator
 from models.LP_optimization import LPBasedSimulator
 from models.rule_based import TimeWindowRuleBasedSimulator
 
+import logging
+from utils.logging_config import setup_logging
+
+# Setup Logging
+setup_logging(logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 sim_config = {
     "capacity_mwh": 1.0,
     "power_mw": 0.5,
@@ -37,18 +44,20 @@ def run_simulation(
     rerun_simulation=False,
     **simulator_kwargs,
 ):
-    print(f"Running simulation: {model_name}")
+    logger.info(f"Running simulation: {model_name}")
     result_path = get_results_path(model_name)
 
     if not rerun_simulation and os.path.exists(result_path):
         result_df = pd.read_csv(result_path, parse_dates=["timestamp"])
-        print(f"Loaded cached results: {result_path}")
+        logger.info(f"Loaded cached results: {result_path}")
 
     else:
         filtered_config = {
             k: v for k, v in sim_config.items()
             if k in ['capacity_mwh', 'power_mw', 'efficiency', 'degradation_cost_per_mwh', 'grid_fee_per_mwh']
         }
+        logger.debug(f"Filtered simulation config: {filtered_config}")
+        logger.debug(f"Simulator kwargs: {simulator_kwargs}")
 
         sim = simulator_cls(
             pv_series=pv_series,
@@ -67,9 +76,11 @@ def run_simulation(
         )
         result_df['Model_Name'] = model_name
         save_results_to_csv(result_df, result_path)
+        logger.info(f"Simulation complete. Results saved to {result_path}")
 
     fig = plot_results(result_df, title=f"{model_name} Operation")
-    print(f"{model_name} Total Profit: €{result_df['cumulative_profit'].iloc[-1]:,.2f}")
+    total_profit = result_df['cumulative_profit'].iloc[-1]
+    logger.info(f"{model_name} Total Profit: €{total_profit:,.2f}")
     return result_df, fig
 
 
@@ -81,6 +92,7 @@ def main():
         help="Run a new simulation (default: use saved results)",
     )
     args = parser.parse_args()
+    logger.info(f"Args received: {args}")
 
     # Registered strategies
     models = {
@@ -108,6 +120,8 @@ def main():
 
         fig.show()
 
+    fig.show()
+    logger.info("Simulation complete and figure shown")
 
 if __name__ == "__main__":
     main()
