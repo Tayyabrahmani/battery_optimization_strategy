@@ -137,7 +137,8 @@ class LPBasedSimulator:
         profit = cp.sum(revenue + pv_export_revenue - grid_cost - degradation)
         problem = cp.Problem(cp.Maximize(profit), constraints)
 
-        problem.solve(solver=cp.ECOS, feastol=1e-6, abstol=1e-4, reltol=1e-4)
+        # problem.solve(solver=cp.ECOS, feastol=1e-6, abstol=1e-4, reltol=1e-4)
+        problem.solve(solver=cp.HIGHS)
 
         if problem.status != cp.OPTIMAL:
             raise ValueError("LP optimization failed.")
