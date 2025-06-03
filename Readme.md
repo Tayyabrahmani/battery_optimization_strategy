@@ -116,6 +116,30 @@ Helper functions are available in `utils/utils.py` for common tasks like data ha
 
 Contributions are welcome! Please fork the repo, create a feature branch, and submit a pull request.
 
+To ensure code quality and consistency, this project uses **[pre-commit](https://pre-commit.com/)** for automatic code formatting and static checks.
+
+## 🔧 Pre-commit Setup
+
+1. **Install pre-commit** (once per machine):
+
+   ```bash
+   pip install pre-commit
+   ```
+
+2. **Install the Git hook** (once per repo):
+
+   ```bash
+   pre-commit install
+   ```
+
+3. **Run all checks manually** (optional):
+
+   ```bash
+   pre-commit run --all-files
+   ```
+
+This will automatically run formatters like `black`, `isort`, and type checks (`mypy`) before every commit. Please make sure all checks pass before pushing.
+
 ## 📝 License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
