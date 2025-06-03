@@ -74,66 +74,6 @@ def calculate_profit(df, efficiency, grid_fee_per_mwh, degradation_cost_per_mwh,
 def save_results_to_csv(df, file_path, output_dir="results"):
     os.makedirs(output_dir, exist_ok=True)
     df.to_csv(file_path, index=False)
-    print(f"Saved results to {file_path}")
-
-def plot_results(df, title, output_dir="results"):
-    fig = go.Figure()
-
-    # Add price trace (left y-axis)
-    fig.add_trace(go.Scatter(
-        x=df["timestamp"],
-        y=df["cumulative_profit"],
-        name="Cumulative Profit (€)",
-        yaxis="y1",
-        mode="lines"
-    ))
-
-    # Add soc trace (right y-axis)
-    fig.add_trace(go.Scatter(
-        x=df["timestamp"],
-        y=df["soc"],
-        name="State of Charge (SOC)",
-        yaxis="y2",
-        mode="lines"
-    ))
-
-    # Update layout with two y-axes
-    fig.update_layout(
-        title=title,
-        xaxis=dict(
-            title="Time",
-            rangeselector=dict(
-                buttons=list([
-                    dict(count=1, label="1d", step="day", stepmode="backward"),
-                    dict(count=7, label="1w", step="day", stepmode="backward"),
-                    dict(count=1, label="1m", step="month", stepmode="backward"),
-                    dict(step="all")
-                ])
-            ),
-            rangeslider=dict(visible=True),
-            type="date"
-        ),
-        yaxis=dict(
-            title="Cumulative Profit (€)",
-            side="left"
-        ),
-        yaxis2=dict(
-            title="SOC",
-            overlaying="y",
-            side="right"
-        ),
-        legend_title="Metric",
-        height=500,
-        width=1000
-    )
-
-    # Save plot as HTML
-    os.makedirs(output_dir, exist_ok=True)
-    filename = os.path.join(output_dir, f"{title.replace(' ', '_')}.html")
-    fig.write_html(filename)
-    print(f"Saved plot to {filename}")
-
-    return fig
 
 def simulate_pv_generation(df: pd.DataFrame, capacity_mw: float = 5.0) -> pd.Series:
     """

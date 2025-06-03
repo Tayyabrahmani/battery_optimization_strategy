@@ -5,9 +5,9 @@ from utils.utils import (
     calculate_profit,
     save_results_to_csv,
     load_price_data,
-    plot_results,
     get_results_path,
 )
+from utils.plotting import plot_results
 from models.threshold_based import ThresholdBasedSimulator
 from models.LP_optimization import LPBasedSimulator
 from models.rule_based import TimeWindowRuleBasedSimulator
