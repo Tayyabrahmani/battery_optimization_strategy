@@ -1,8 +1,9 @@
-import plotly.express as px
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
-import pandas as pd
 import os
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 
 
 def plot_prices(
@@ -12,12 +13,16 @@ def plot_prices(
     tickformat="%b %d\n%Y",
 ):
     """
-    Plot average electricity prices with consistent formatting.
+    Generate an interactive time series line plot of electricity prices.
 
-    Parameters:
-        df (pd.DataFrame): DataFrame indexed by timestamp with a column for price.
-        title (str): Plot title.
-        y_column (str): Name of the column containing price data.
+    Args:
+        df (pd.DataFrame): DataFrame indexed by timestamp containing price data.
+        title (str): Title of the plot.
+        y_column (str): Name of the column in `df` containing price values.
+        tickformat (str): Date format for x-axis ticks (default: "%b %d\\n%Y").
+
+    Returns:
+        plotly.graph_objects.Figure: Interactive line chart of electricity prices.
     """
     fig = px.line(
         df,
@@ -73,12 +78,19 @@ def plot_boxplot_by_time_unit(
     df, time_unit="hour", price_col="price_eur_per_mwh", range_yaxis=[-200, 400]
 ):
     """
-    Plot a boxplot showing price distribution by hour of the day.
+    Create a boxplot showing electricity price distribution grouped by hour or weekday.
 
-    Parameters:
-        df (pd.DataFrame): DataFrame with a datetime index or column and a price column.
-        timestamp_col (str): Name of the datetime column if not set as index.
-        price_col (str): Name of the price column.
+    Args:
+        df (pd.DataFrame): DataFrame with datetime index and price column.
+        time_unit (str): Time unit to group by — either "hour" or "weekday".
+        price_col (str): Name of the column with price values.
+        range_yaxis (list): y-axis range for price display as [min, max].
+
+    Returns:
+        plotly.graph_objects.Figure: Boxplot of price distribution by time group.
+
+    Raises:
+        ValueError: If `time_unit` is not "hour" or "weekday".
     """
     # Ensure timestamp is in a column for plotting
 
@@ -141,6 +153,21 @@ def plot_boxplot_by_time_unit(
 
 
 def plot_charge_discharge_vs_price(df):
+    """
+    Plot battery charging/discharging power and electricity market price over time.
+
+    Displays:
+        - Market price on the left y-axis (€/MWh).
+        - Charging and discharging power on the right y-axis (kW).
+        - Discharging is shown as negative values.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing:
+            - 'timestamp' (datetime): Timestamps for each time step.
+            - 'price_eur_per_mwh' (float): Market electricity prices.
+            - 'charge_mwh' (float): Energy charged during the timestep (MWh).
+            - 'discharge_mwh' (float): Energy discharged during the timestep (MWh).
+    """
     fig = go.Figure()
 
     # Price (left axis)
@@ -229,6 +256,17 @@ def plot_charge_discharge_vs_price(df):
 
 
 def plot_soc(df):
+    """
+    Plot the battery's state of charge (SoC) over time.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing:
+            - 'timestamp' (datetime): Timestamps for each interval.
+            - 'soc' (float): State of charge in MWh.
+
+    Returns:
+        None: Displays an interactive Plotly line chart of SoC vs time.
+    """
     fig = go.Figure()
 
     fig.add_trace(
@@ -274,11 +312,18 @@ def plot_soc(df):
 
 def plot_monthly_cycles(df: pd.DataFrame, soc_max: float = None):
     """
-    Plots monthly full equivalent battery cycles.
+    Plot the number of full equivalent battery cycles per month.
 
-    Parameters:
-    - df: DataFrame with 'timestamp', 'discharge_mwh', and 'soc' columns
-    - soc_max: Optional, maximum SoC (defaults to max(df['soc']))
+    A full equivalent cycle is calculated as:
+        total_discharge_energy_in_month / soc_max
+
+    Args:
+        df (pd.DataFrame): Must contain 'timestamp', 'discharge_mwh', and 'soc' columns.
+        soc_max (float, optional): Max state of charge capacity in MWh.
+            If None, defaults to max(df['soc']).
+
+    Returns:
+        pd.Series: Monthly full equivalent cycle counts, indexed by month.
     """
     if soc_max is None:
         soc_max = df["soc"].max()
@@ -305,6 +350,22 @@ def plot_line_over_time_by_category(
     model_col: str = "Model_Name",
     title: str = "Cumulative Profit Over Time",
 ):
+    """
+    Plot a multi-line time series comparing values across different categories.
+
+    Each line represents a distinct category (e.g., model) showing its value trend over time.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing the time series data.
+        time_col (str): Column name representing time (x-axis).
+        value_col (str): Column name for the value to be plotted (y-axis).
+        model_col (str): Column name representing categories to group lines by.
+        title (str): Plot title.
+
+    Returns:
+        plotly.graph_objects.Figure: Interactive line chart grouped by `model_col`.
+    """
+
     fig = go.Figure()
 
     for model in df[model_col].unique():
@@ -366,6 +427,25 @@ def plot_sensitivity_analysis(
     marker_color="blue",
     line_color="black",
 ):
+    """
+    Plot a sensitivity analysis chart showing how a KPI changes with respect to a parameter.
+
+    Highlights:
+        - Main KPI curve with lines and markers.
+        - Annotated markers for maximum and minimum KPI values.
+
+    Args:
+        x_values (list or array): Values of the parameter varied (x-axis).
+        y_values (list or array): Corresponding KPI values (y-axis).
+        x_label (str): Label for the x-axis.
+        y_label (str): Label for the y-axis.
+        title (str): Plot title.
+        marker_color (str): Color of the main data markers.
+        line_color (str): Color of the KPI line.
+
+    Returns:
+        plotly.graph_objects.Figure: Interactive sensitivity analysis plot.
+    """
     fig = go.Figure()
 
     # Add main line plot
@@ -440,6 +520,25 @@ def plot_sensitivity_analysis(
 
 
 def plot_results(df, title, output_dir="results"):
+    """
+    Plot cumulative profit and battery state of charge (SOC) over time with dual y-axes.
+
+    - Left y-axis: Cumulative profit (€).
+    - Right y-axis: SOC (State of Charge).
+    - Includes interactive range selector and range slider.
+    - Saves the plot as an HTML file in the specified output directory.
+
+    Args:
+        df (pd.DataFrame): DataFrame with columns:
+            - 'timestamp' (datetime): Time index for the plot.
+            - 'cumulative_profit' (float): Profit values.
+            - 'soc' (float): State of charge values.
+        title (str): Title of the plot and output filename.
+        output_dir (str): Directory to save the plot HTML file (default: "results").
+
+    Returns:
+        plotly.graph_objects.Figure: The generated interactive figure.
+    """
     fig = go.Figure()
 
     # Add price trace (left y-axis)
