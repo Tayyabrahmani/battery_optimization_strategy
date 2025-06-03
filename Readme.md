@@ -53,11 +53,6 @@ source .venv/bin/activate
 uv pip install .
 ```
 
-5. **Install ecos package separately**:
-```
-pip install ecos
-```
-
 *This project uses `pyproject.toml` to manage dependencies with `uv`.*
 
 ### Data Preparation
