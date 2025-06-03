@@ -1,19 +1,20 @@
 import argparse
+import logging
 import os
+
 import pandas as pd
-from utils.utils import (
-    calculate_profit,
-    save_results_to_csv,
-    load_price_data,
-    get_results_path,
-)
-from utils.plotting import plot_results
-from models.threshold_based import ThresholdBasedSimulator
+
 from models.LP_optimization import LPBasedSimulator
 from models.rule_based import TimeWindowRuleBasedSimulator
-
-import logging
+from models.threshold_based import ThresholdBasedSimulator
 from utils.logging_config import setup_logging
+from utils.plotting import plot_results
+from utils.utils import (
+    calculate_profit,
+    get_results_path,
+    load_price_data,
+    save_results_to_csv,
+)
 
 # Setup Logging
 setup_logging(logging.DEBUG)
@@ -37,6 +38,7 @@ simulator_configs = {
     "Linear-Programming": {},
 }
 
+
 def run_simulation(
     model_name,
     simulator_cls,
@@ -56,8 +58,16 @@ def run_simulation(
 
     else:
         filtered_config = {
-            k: v for k, v in sim_config.items()
-            if k in ['capacity_mwh', 'power_mw', 'efficiency', 'degradation_cost_per_mwh', 'grid_fee_per_mwh']
+            k: v
+            for k, v in sim_config.items()
+            if k
+            in [
+                "capacity_mwh",
+                "power_mw",
+                "efficiency",
+                "degradation_cost_per_mwh",
+                "grid_fee_per_mwh",
+            ]
         }
         logger.debug(f"Filtered simulation config: {filtered_config}")
         logger.debug(f"Simulator kwargs: {simulator_kwargs}")
@@ -77,12 +87,12 @@ def run_simulation(
             grid_fee_per_mwh=sim_config["grid_fee_per_mwh"],
             pv_setup_cost_eur=sim_config.get("pv_setup_cost_eur", 0.0),
         )
-        result_df['Model_Name'] = model_name
+        result_df["Model_Name"] = model_name
         save_results_to_csv(result_df, result_path)
         logger.info(f"Simulation complete. Results saved to {result_path}")
 
     fig = plot_results(result_df, title=f"{model_name} Operation")
-    total_profit = result_df['cumulative_profit'].iloc[-1]
+    total_profit = result_df["cumulative_profit"].iloc[-1]
     logger.info(f"{model_name} Total Profit: €{total_profit:,.2f}")
     return result_df, fig
 
@@ -138,6 +148,7 @@ def main():
 
     fig.show()
     logger.info("Simulation complete and figure shown")
+
 
 if __name__ == "__main__":
     main()
