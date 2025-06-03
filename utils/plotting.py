@@ -312,7 +312,7 @@ def plot_soc(df):
 
 def plot_monthly_cycles(df: pd.DataFrame, soc_max: float = None):
     """
-    Plot the number of full equivalent battery cycles per month.
+    Plot the number of full equivalent battery cycles per month using Plotly.
 
     A full equivalent cycle is calculated as:
         total_discharge_energy_in_month / soc_max
@@ -330,15 +330,20 @@ def plot_monthly_cycles(df: pd.DataFrame, soc_max: float = None):
 
     df = df.copy()
     df["month"] = df["timestamp"].dt.to_period("M")
-
     monthly_discharge = df.groupby("month")["discharge_mwh"].sum()
     monthly_cycles = monthly_discharge / soc_max
 
-    monthly_cycles.plot(kind="bar", title="Monthly Full Equivalent Cycles")
-    plt.ylabel("Full Equivalent Cycles")
-    plt.xlabel("Month")
-    plt.tight_layout()
-    plt.show()
+    # Convert PeriodIndex to strings for readable x-axis
+    x_labels = monthly_cycles.index.strftime("%b %Y")
+
+    fig = px.bar(
+        x=x_labels,
+        y=monthly_cycles.values,
+        labels={"x": "Month", "y": "Full Equivalent Cycles"},
+        title="Monthly Full Equivalent Cycles",
+    )
+    fig.update_layout(xaxis_title="Month", yaxis_title="Full Equivalent Cycles")
+    fig.show()
 
     return monthly_cycles
 
