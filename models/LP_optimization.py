@@ -2,9 +2,10 @@
 import cvxpy as cp
 import numpy as np
 import pandas as pd
+from models.base_simulator import BatterySimulator
 
 
-class LPBasedSimulator:
+class LPBasedSimulator(BatterySimulator):
     """
     Linear programming-based simulator for battery energy storage systems with optional PV and load inputs.
 
@@ -44,22 +45,9 @@ class LPBasedSimulator:
             load_series (pd.Series, optional): Time-indexed load profile.
             **kwargs: Ignored keyword arguments for future extensions.
         """
-        self.capacity = capacity_mwh
-        self.max_power = power_mw
-        self.efficiency = efficiency
-        self.degradation_cost = degradation_cost_per_mwh
-        self.grid_fee = grid_fee_per_mwh
+        super().__init__(capacity_mwh, power_mw, efficiency, degradation_cost_per_mwh, grid_fee_per_mwh)
         self.pv_series = pv_series
         self.load_series = load_series
-        self.soc = 0.5 * capacity_mwh
-        self.results = []
-
-    def reset(self):
-        """
-        Reset the state of charge to 50% and clear all simulation results.
-        """
-        self.soc = 0.5 * self.capacity
-        self.results = []
 
     def simulate_day(self, day_prices: pd.DataFrame):
         """
@@ -171,22 +159,3 @@ class LPBasedSimulator:
                     "pv_export_mwh": export_pv_to_grid.value[i],
                 }
             )
-
-    def run_simulation(self, price_df):
-        """
-        Run simulation over all days in the provided price DataFrame.
-
-        Args:
-            price_df (pd.DataFrame): Time-series price data with a 'timestamp' column.
-        """
-        for day, group in price_df.groupby(price_df["timestamp"].dt.date):
-            self.simulate_day(group)
-
-    def to_dataframe(self):
-        """
-        Convert simulation results into a pandas DataFrame.
-
-        Returns:
-            pd.DataFrame: A DataFrame where each row represents a timestep's results.
-        """
-        return pd.DataFrame(self.results)
